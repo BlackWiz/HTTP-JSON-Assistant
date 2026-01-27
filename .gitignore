@@ -1,32 +1,21 @@
-# Build artifacts
+# STM32CubeIDE / Eclipse
+/Debug/
+/Release/
+/.settings/
+/.mxproject
+*.launch
+.project
+.cproject
+*.ioc.bak
+
+# Build Artifacts
 *.elf
 *.bin
 *.hex
 *.map
-*.o
-*.d
-*.asm
+*.su
+*.list
 
-# Test artifacts
-test_*.elf
-test_*.bin
-test_*.map
-
-# Private documentation (interview prep)
-docs/
-
-# Unit tests (not ready for commit)
-tests/
-
-# IDE/Editor files
-.vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Temporary files
-temp-serial-json-bridge/
-
-# Debug files
-*.log
+# Temporary
+__pycache__/
+*.dump
