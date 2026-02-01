@@ -17,6 +17,8 @@
 #include "netif/ethernet.h"
 #include "ethernetif.h"
 #include "enc28j60.h"
+#include "tcp_echo.h"
+#include "http_server.h"
 
 /* Global Variables */
 struct netif gnetif;
@@ -90,6 +92,9 @@ int main(void)
 
   // 5. LwIP Init
   lwip_init();
+
+  app_echoserver_init();  // Starts the Echo Server (Port 7)
+  http_server_init();     // Starts your HTTP Server (Port 80) <--- Add this
 
   // 6. IP Settings
   ip4_addr_t ipaddr, netmask, gw;
@@ -180,6 +185,16 @@ static void MX_GPIO_Init(void)
 {
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET); // Start OFF
+
+    GPIO_InitStruct.Pin = LED_BLUE_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP; // Push-Pull Output
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_BLUE_GPIO_Port, &GPIO_InitStruct);
 }
 
 void Error_Handler(void)

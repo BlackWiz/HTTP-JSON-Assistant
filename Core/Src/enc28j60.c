@@ -42,6 +42,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "enc28j60.h"
 #include "main.h"
+#include <string.h>
+#include <stdio.h>
 
 /* SPI handle */
 extern SPI_HandleTypeDef hspi1;

@@ -71,6 +71,8 @@ void Error_Handler(void);
 #define TCK_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
+#define LED_BLUE_Pin GPIO_PIN_0
+#define LED_BLUE_GPIO_Port GPIOA
 
 /* USER CODE END Private defines */
 
