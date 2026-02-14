@@ -12,23 +12,23 @@
 
 I maintain two active branches to demonstrate the difference between "Application Development" and "System Engineering."
 
-### [The Bare-Metal Engine (Dev Branch)](https://github.com/BlackWiz/HTTP-JSON-Assistant/tree/dev)
+### [The Bare-Metal Engine (Dev Branch)](https://github.com/BlackWiz/HTTP-Ethernet-Assistant/tree/dev)
 **"The Deep Dive"**
 
 * **Philosophy:** Zero abstraction. Direct register access.
 * **Why:** To understand exactly how ENC28J60 SPI protocol and LwIP stack interact without HAL overhead.
 * **Key Tech:** Manual SPI driver, custom interrupt handlers, register-level GPIO, LwIP (NO_SYS).
 * **Status:** Active development
-* [**👉 View Bare-Metal Code**](https://github.com/BlackWiz/HTTP-JSON-Assistant/tree/dev)
+* [**👉 View Bare-Metal Code**](https://github.com/BlackWiz/HTTP-Ethernet-Assistant/tree/dev)
 
-### [The HAL Reference (Main Branch)](https://github.com/BlackWiz/HTTP-JSON-Assistant/tree/main)
+### [The HAL Reference (Main Branch)](https://github.com/BlackWiz/HTTP-Ethernet-Assistant/tree/main)
 **"The Prototype"**
 
 * **Philosophy:** Rapid development using STM32CubeHAL.
 * **Why:** Validated hardware connections, network logic, and ThingSpeak API integration before optimizing.
 * **Key Tech:** STM32 HAL, CubeMX configuration.
 * **Status:** Stable reference implementation
-* [**👉 View Reference Code**](https://github.com/BlackWiz/HTTP-JSON-Assistant/tree/main)
+* [**👉 View Reference Code**](https://github.com/BlackWiz/HTTP-Ethernet-Assistant/tree/main)
 
 ---
 
