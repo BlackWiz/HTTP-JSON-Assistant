@@ -74,6 +74,14 @@ void Error_Handler(void);
 #define LED_BLUE_Pin GPIO_PIN_0
 #define LED_BLUE_GPIO_Port GPIOA
 
+// --- Network Configuration Switch ---
+// 0 = Use Static IP (Direct connection to PC)
+// 1 = Use DHCP (Connection to Router with Internet)
+#define USE_DHCP 1
+
+// --- Test Macro to check system sanity ---
+#define TEST_MODE_LED 0
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

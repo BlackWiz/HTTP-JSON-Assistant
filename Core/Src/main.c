@@ -1,6 +1,6 @@
 /* USER CODE BEGIN Header */
 /**
-  * FINAL INTEGRATION: STM32 + ENC28J60 + LwIP + ThingSpeak
+  * FINAL INTEGRATION: STM32 + ENC28J60 + LwIP
   * CS Pin: PA5 (Green LED) - Hardwired Override
   */
 /* USER CODE END Header */
@@ -19,20 +19,10 @@
 #include "enc28j60.h"
 #include "tcp_echo.h"
 #include "http_server.h"
-#include "thingspeak.h" // <-- Added ThingSpeak Driver
-
 #if LWIP_DHCP
 #include "lwip/dhcp.h"  // <-- Needed if DHCP is enabled
+#include "thingspeak.h"
 #endif
-
-/* USER CODE BEGIN PV */
-#define STACK_CANARY 0xDEADBEEF
-
-// --- Network Configuration Switch ---
-// 0 = Use Static IP (Direct connection to PC)
-// 1 = Use DHCP (Connection to Router with Internet)
-#define USE_DHCP 1
-/* USER CODE END PV */
 
 /* Global Variables */
 struct netif gnetif;
@@ -47,13 +37,9 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
-static void Paint_Stack(void);
 
 int main(void)
 {
-  /* USER CODE BEGIN 1 */
-  Paint_Stack();
-  /* USER CODE END 1 */
   HAL_Init();
   SystemClock_Config();
   MX_GPIO_Init();
@@ -74,7 +60,7 @@ int main(void)
 
   // 2. UART Debug Message
   char msg[100];
-  sprintf(msg, "\r\n--- STM32 + LwIP + ThingSpeak Client ---\r\n");
+  sprintf(msg, "\r\n--- STM32 + LwIP + ENC28J60 START ---\r\n");
   HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
   HAL_Delay(100);
 
@@ -105,17 +91,17 @@ int main(void)
   }
 
   HAL_UART_Transmit(&huart2, (uint8_t*)"Forcing MAC update...\r\n", 23, 100);
-  enc_force_mac_hardware(&henc);
-  HAL_UART_Transmit(&huart2, (uint8_t*)"MAC Updated.\r\n", 14, 100);
+    enc_force_mac_hardware(&henc);
+    HAL_UART_Transmit(&huart2, (uint8_t*)"MAC Updated.\r\n", 14, 100);
 
   // 5. LwIP Init
   lwip_init();
+#if !USE_DHCP
+  app_echoserver_init();  // Starts the Echo Server (Port 7)
+#endif
+  http_server_init();     // Starts your HTTP Server (Port 80) <--- Add this
 
-//  app_echoserver_init();  // Starts the Echo Server (Port 7)
-//  http_server_init();     // Starts your HTTP Server (Port 80)
-  thingspeak_init();      // Initialize ThingSpeak Client
-
-  // 6. IP Settings Architecture
+  // 6. IP Settings
   ip4_addr_t ipaddr, netmask, gw;
 
 #if USE_DHCP
@@ -123,13 +109,10 @@ int main(void)
   IP4_ADDR(&ipaddr, 0, 0, 0, 0);
   IP4_ADDR(&netmask, 0, 0, 0, 0);
   IP4_ADDR(&gw, 0, 0, 0, 0);
-  HAL_UART_Transmit(&huart2, (uint8_t*)"LwIP UP! Requesting DHCP...\r\n", 29, 100);
 #else
-  // Static IP Configuration
   IP4_ADDR(&ipaddr, 192, 168, 0, 200);
   IP4_ADDR(&netmask, 255, 255, 255, 0);
   IP4_ADDR(&gw, 192, 168, 0, 1);
-  HAL_UART_Transmit(&huart2, (uint8_t*)"LwIP UP! Static IP: 192.168.0.200\r\n", 35, 100);
 #endif
 
   // 7. Add Interface
@@ -138,47 +121,82 @@ int main(void)
 
   if (netif_is_link_up(&gnetif)) {
       netif_set_up(&gnetif);
+#if USE_DHCP
+      HAL_UART_Transmit(&huart2, (uint8_t*)"Link UP! Waiting for DHCP...\r\n", 30, 100);
+#else
+      sprintf(msg, "LwIP UP! IP: 192.168.0.200\r\n");
+      HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
+#endif
   } else {
-      netif_set_up(&gnetif); // Force up
+      netif_set_up(&gnetif);
+#if USE_DHCP
+      HAL_UART_Transmit(&huart2, (uint8_t*)"Link DOWN? Forcing UP! Waiting for DHCP...\r\n", 44, 100);
+#else
+      sprintf(msg, "LwIP UP (Forced). IP: 192.168.0.200\r\n");
+      HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
+#endif
   }
 
 #if USE_DHCP
   dhcp_start(&gnetif); // Start the DHCP client process
+  thingspeak_init(); // ThingSpeak Init
 #endif
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
+#if TEST_MODE_LED
   uint32_t last_arp_time = 0;
-  uint32_t last_upload_time = 0; // Timer for ThingSpeak
-  int packet_counter = 0;        // Simulated Sensor Data
-
-#if(0)
-  /* Simulating a Forced fault (Disabled for Production) */
-  volatile uint32_t *invalid_ptr = (uint32_t *)0xFFFFFFF0;
-  *invalid_ptr = 0xDEADBEEF;
 #endif
 
-  while (1)
+#if USE_DHCP
+  uint8_t dhcp_ip_printed = 0; // Flag to only print IP once
+#endif
+
+ while (1)
   {
     ethernetif_input(&gnetif);
     sys_check_timeouts();
 
-    // Heartbeat LED (1 Second)
-    if (HAL_GetTick() - last_arp_time > 1000)
-    {
-       last_arp_time = HAL_GetTick();
-       HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-    }
+#if USE_DHCP
+  // Check if DHCP has assigned an IP address yet
+  if (!dhcp_ip_printed)
+   {
+	  uint32_t my_ip = netif_ip4_addr(&gnetif)->addr;
+	  if (my_ip != 0) { // 0 means no IP yet. Anything else means success!
+	  char ip_msg[64];
+	  snprintf(ip_msg, sizeof(ip_msg), "\r\n>>> SUCCESS! DHCP IP is: %lu.%lu.%lu.%lu <<<\r\n",
+	  (my_ip & 0xff), ((my_ip >> 8) & 0xff), ((my_ip >> 16) & 0xff), (my_ip >> 24));
+	  HAL_UART_Transmit(&huart2, (uint8_t*)ip_msg, strlen(ip_msg), 100);
+	  dhcp_ip_printed = 1; // Stop checking
+   }
+  }
 
-    // ThingSpeak Upload (Every 20 Seconds)
-    if (HAL_GetTick() - last_upload_time > 20000)
-    {
-       last_upload_time = HAL_GetTick();
+  // ThingSpeak Cloud Telemetry (Fires every 20 seconds)
+  static uint32_t last_ts_time = 0;
 
-       // Send Uptime (seconds) and packet count to Cloud
-       thingspeak_send(HAL_GetTick()/1000, packet_counter++);
-    }
+  // ONLY send if we actually have an IP address from DHCP!
+  if (dhcp_ip_printed && (HAL_GetTick() - last_ts_time > 20000))
+  {
+	 last_ts_time = HAL_GetTick();
+
+	 // Create some dummy data to upload
+	 static int ts_counter = 0;
+	 int uptime_seconds = HAL_GetTick() / 1000;
+
+	 thingspeak_send(uptime_seconds, ts_counter++);
+  }
+#endif
+
+#if TEST_MODE_LED
+ // Safe Test LED (1 Second)
+ // In case If system doesnt work simple test to check basic LED Blinky
+  if (HAL_GetTick() - last_arp_time > 1000)
+  {
+	 last_arp_time = HAL_GetTick();
+	 HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
+  }
+#endif
   }
 }
 
@@ -256,80 +274,3 @@ uint32_t sys_now(void)
 {
   return HAL_GetTick();
 }
-
-/* USER CODE BEGIN 0 */
-
-// --- 1. THE PANIC PRINTER (Direct Register Access) ---
-void UART_Panic_Print(char *str) {
-    USART_TypeDef *uart = USART2;
-    while (*str) {
-        while (!(uart->ISR & USART_ISR_TXE_TXFNF));
-        uart->TDR = *str++;
-    }
-    while (!(uart->ISR & USART_ISR_TC));
-}
-
-void UART_Panic_Print_Hex(uint32_t val) {
-    char hex[] = "0123456789ABCDEF";
-    char buf[11];
-    buf[0] = '0'; buf[1] = 'x';
-    for (int i = 0; i < 8; i++) {
-        buf[9 - i] = hex[(val >> (i * 4)) & 0xF];
-    }
-    buf[10] = '\0';
-    UART_Panic_Print(buf);
-}
-
-// --- 2. THE C HANDLER (Analyzes the Crash) ---
-void HardFault_Handler_C(uint32_t *stack_frame) {
-    volatile uint32_t r0 = stack_frame[0];
-    volatile uint32_t lr = stack_frame[5];
-    volatile uint32_t pc = stack_frame[6];
-
-    UART_Panic_Print("\r\n\r\n!!! CRASH DETECTED (HardFault) !!!\r\n");
-    UART_Panic_Print("PC (Where it died): ");
-    UART_Panic_Print_Hex(pc);
-    UART_Panic_Print("\r\n");
-
-    UART_Panic_Print("LR (Who called it): ");
-    UART_Panic_Print_Hex(lr);
-    UART_Panic_Print("\r\n");
-
-    UART_Panic_Print("R0 (First Arg):     ");
-    UART_Panic_Print_Hex(r0);
-    UART_Panic_Print("\r\n");
-
-    UART_Panic_Print("System Halted. Check your .map file for the PC address.\r\n");
-
-    __asm("bkpt 255");
-    while (1);
-}
-
-// --- 3. THE ASSEMBLY SHIM (Captures the Stack Pointer) ---
-__attribute__((naked)) void HardFault_Handler(void) {
-    __asm volatile (
-        " movs r0, #4          \n"
-        " mov r1, lr           \n"
-        " tst r0, r1           \n"
-        " bne use_psp          \n"
-        " mrs r0, msp          \n"
-        " b call_c             \n"
-        "use_psp:              \n"
-        " mrs r0, psp          \n"
-        "call_c:               \n"
-        " ldr r2, =HardFault_Handler_C \n"
-        " bx r2                \n"
-    );
-}
-
-// --- 4. THE STACK PAINTER (Flood Gauge) ---
-extern uint32_t _estack;
-extern uint32_t _end;
-
-static void Paint_Stack(void) {
-    uint32_t *p = &_end;
-    while (p < (&_estack - 16)) {
-        *p++ = STACK_CANARY;
-    }
-}
-/* USER CODE END 0 */

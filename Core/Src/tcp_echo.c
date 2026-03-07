@@ -7,6 +7,8 @@
 
 #include "tcp_echo.h"
 
+#if !USE_DHCP
+
 static struct tcp_pcb *pcb_server;		//echoserver pcb
 
 /* callback functions */
@@ -276,3 +278,5 @@ static void app_close_connection(struct tcp_pcb *tpcb, struct tcp_echoserver_str
 
   tcp_close(tpcb);		//close connection
 }
+
+#endif /* !USE_DHCP */

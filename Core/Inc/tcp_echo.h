@@ -11,6 +11,9 @@
 #include "lwip/debug.h"
 #include "lwip/stats.h"
 #include "lwip/tcp.h"
+#include "main.h"
+
+#if !USE_DHCP
 
 #define  ECHO_SERVER_LISTEN_PORT	7
 
@@ -33,5 +36,7 @@ struct tcp_echoserver_struct
 };
 
 err_t app_echoserver_init(void);
+
+#endif /* !USE_DHCP */
 
 #endif /* INC_TCP_ECHO_H_ */
